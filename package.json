@@ -1,8 +1,0 @@
-{
-  "name": "yt-sub-bot",
-  "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "googleapis": "^135.0.0"
-  }
-}
