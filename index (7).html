@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT Sub Bot Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; color: #18181b; padding: 24px; max-width: 900px; margin: 0 auto; }
+    nav { background: #1e1e2e; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; margin: -24px -24px 24px -24px; }
+    nav .brand { color: #fff; font-size: 1.2rem; font-weight: 700; }
+    nav .links a { color: #a1a1aa; text-decoration: none; margin-left: 24px; font-size: 0.9rem; }
+    nav .links a:hover { color: #fff; }
+    .card { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 16px; color: #18181b; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat { background: #f9f9fb; border: 1px solid #e4e4e7; border-radius: 8px; padding: 16px; }
+    .stat label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; margin-bottom: 8px; }
+    .stat .value { font-size: 1.1rem; font-weight: 600; color: #18181b; }
+    .stat .value.error { color: #ef4444; }
+    .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { background: #71717a; color: #fff; }
+    .btn-secondary:hover { background: #52525b; }
+    .row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    input, select { background: #fff; color: #18181b; border: 1px solid #d4d4d8; padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; }
+    input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.15); }
+    .log { background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 0.8rem; max-height: 200px; overflow-y: auto; color: #8f8; white-space: pre-wrap; }
+    .hidden { display: none; }
+    #channel-form { margin-bottom: 16px; }
+    #channel-form input { width: 300px; }
+    #log { margin-top: 16px; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+    .status-badge.pending { background: #fef3c7; color: #92400e; }
+    .status-badge.active { background: #d1fae5; color: #065f46; }
+    .status-badge.error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand">YT Sub Bot</div>
+    <div class="links">
+      <a href="#">Dashboard</a>
+      <a href="#">Orders</a>
+      <a href="#">Subscribe</a>
+    </div>
+  </nav>
+
+  <div class="card">
+    <h2>Account Status</h2>
+    <div class="stats">
+      <div class="stat">
+        <label>EMAIL</label>
+        <div class="value" id="email">Loading...</div>
+      </div>
+      <div class="stat">
+        <label>QUOTA USED</label>
+        <div class="value" id="quota">--</div>
+      </div>
+      <div class="stat">
+        <label>SUBSCRIBERS</label>
+        <div class="value" id="subscribers">--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Quick Actions</h2>
+    <button class="btn btn-primary" onclick="document.getElementById('subscribe-section').scrollIntoView({behavior:'smooth'})">Add Subscribe Order</button>
+    <button class="btn btn-secondary" onclick="loadOrders()">View Orders</button>
+  </div>
+
+  <div class="card" id="subscribe-section">
+    <h2>Add Channel</h2>
+    <div class="row" id="channel-form">
+      <input type="text" id="channel-id" placeholder="YouTube Channel ID or URL" />
+      <button class="btn btn-primary" onclick="addChannel()">Add</button>
+    </div>
+    <div id="channel-status" class="hidden"></div>
+  </div>
+
+  <div class="card">
+    <h2>Orders</h2>
+    <div id="orders-list">Loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>Activity Log</h2>
+    <div id="log" class="log">Ready.</div>
+  </div>
+
+  <script>
+    const API_BASE = '/.netlify/functions';
+
+    async function log(msg) {
+      const el = document.getElementById('log');
+      const time = new Date().toLocaleTimeString();
+      el.textContent = `[${time}] ${msg}\n` + el.textContent;
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/status`);
+        const data = await res.json();
+
+        if (data.valid && data.data) {
+          const emailEl = document.getElementById('email');
+          const quotaEl = document.getElementById('quota');
+          const subsEl = document.getElementById('subscribers');
+
+          if (data.data.requiresAuth) {
+            emailEl.textContent = 'Login required';
+            emailEl.classList.add('error');
+          } else {
+            emailEl.textContent = data.data.email || 'No email';
+            emailEl.classList.remove('error');
+          }
+
+          quotaEl.textContent = data.data.quotaUsed || '--';
+          subsEl.textContent = data.data.subscribers || '--';
+        } else {
+          document.getElementById('email').textContent = 'Error loading';
+          document.getElementById('email').classList.add('error');
+          log(`Status error: ${data.error || 'Unknown'}`);
+        }
+      } catch (err) {
+        document.getElementById('email').textContent = 'Error loading';
+        document.getElementById('email').classList.add('error');
+        log(`Status fetch failed: ${err.message}`);
+      }
+    }
+
+    async function loadOrders() {
+      try {
+        const res = await fetch(`${API_BASE}/orders`);
+        const data = await res.json();
+        const list = document.getElementById('orders-list');
+        if (!data.orders || data.orders.length === 0) {
+          list.innerHTML = '<p style="color:#71717a">No orders yet.</p>';
+          return;
+        }
+        list.innerHTML = data.orders.map(o => `
+          <div class="row" style="border-bottom:1px solid #e4e4e7;padding:10px 0">
+            <span style="flex:1;font-weight:600">#${o.id}</span>
+            <span style="flex:2">${o.channelName || o.channelId}</span>
+            <span class="status-badge ${o.status}">${o.status}</span>
+            <span style="color:#71717a;font-size:0.8rem">${o.createdAt || ''}</span>
+          </div>
+        `).join('');
+      } catch (err) {
+        document.getElementById('orders-list').innerHTML = `<p style="color:#ef4444">Error loading orders: ${err.message}</p>`;
+      }
+    }
+
+    async function addChannel() {
+      const input = document.getElementById('channel-id');
+      let channelId = input.value.trim();
+      if (!channelId) return;
+
+      // If user pasted a full YouTube URL, extract the channel ID
+      const urlMatch = channelId.match(/channel\/(UC[\w-]{22})/);
+      if (urlMatch) {
+        channelId = urlMatch[1];
+        input.value = channelId;
+      }
+
+      const statusEl = document.getElementById('channel-status');
+      statusEl.classList.remove('hidden');
+      statusEl.innerHTML = '<span class="status-badge pending">Adding...</span>';
+      input.disabled = true;
+
+      try {
+        const res = await fetch(`${API_BASE}/subscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channelId })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          statusEl.innerHTML = `<span class="status-badge active">Added (order #${data.orderId})</span>`;
+          log(`Channel ${channelId} added as order #${data.orderId}`);
+          input.value = '';
+          loadOrders();
+        } else {
+          statusEl.innerHTML = `<span class="status-badge error">${data.error || 'Failed'}</span>`;
+          log(`Error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        statusEl.innerHTML = `<span class="status-badge error">Network error</span>`;
+        log(`Network error: ${err.message}`);
+      } finally {
+        input.disabled = false;
+      }
+    }
+
+    // Init
+    loadStatus();
+    loadOrders();
+  </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"9f0cb6c09a0044d6981ba2b8776adb52","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
