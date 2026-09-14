@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Sub Bot</title>
+<style>
+  body { font-family: sans-serif; background: #0f0f0f; color: #fff; padding: 2rem; max-width: 600px; margin: 0 auto; }
+  h1 { color: #ff0000; }
+  form { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  input { padding: 10px; background: #222; border: 1px solid #444; color: #fff; }
+  button { padding: 10px; background: #ff0000; color: #fff; border: none; cursor: pointer; font-weight: bold; }
+  #msg { margin: 10px 0; font-size: 0.9rem; }
+  .err { color: #ff6b6b; }
+  .ok { color: #51cf66; }
+</style>
+</head>
+<body>
+  <h1>YT Sub Bot</h1>
+  <form id="botForm">
+    <input type="text" id="channelId" placeholder="YouTube Channel ID" required>
+    <input type="text" id="apiKey" placeholder="YouTube API Key" required>
+    <button type="submit">Add Channel</button>
+  </form>
+  <div id="msg"></div>
+  <div id="channels"></div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    document.getElementById('botForm').onsubmit = async (e) => {
+      e.preventDefault();
+      msg.textContent = 'Processing...';
+      msg.className = '';
+      try {
+        const res = await fetch('/.netlify/functions/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({
+            channelId: document.getElementById('channelId').value,
+            apiKey: document.getElementById('apiKey').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Server Error');
+        msg.textContent = 'Success!';
+        msg.className = 'ok';
+      } catch (err) {
+        msg.textContent = 'Error: ' + err.message;
+        msg.className = 'err';
+      }
+    };
+  </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"9f0cb6c09a0044d6981ba2b8776adb52","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
