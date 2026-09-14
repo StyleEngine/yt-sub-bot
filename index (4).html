@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Sub Bot Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+header { background: #222; color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+header h1 { font-size: 1.2rem; }
+.container { max-width: 600px; margin: 32px auto; padding: 0 16px; }
+.card { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.card h2 { font-size: 1rem; margin-bottom: 12px; color: #555; }
+.btn { display: inline-block; padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.95rem; font-weight: 600; }
+.btn-primary { background: #4285f4; color: #fff; }
+.btn-primary:hover { background: #3367d6; }
+.btn-danger { background: #ea4335; color: #fff; }
+.btn-danger:hover { background: #d93025; }
+.btn-success { background: #34a853; color: #fff; }
+.btn-success:hover { background: #2d8f47; }
+.input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; margin-bottom: 8px; }
+.input:focus { outline: none; border-color: #4285f4; }
+.status { padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; margin-top: 8px; }
+.status-ok { background: #e6f4ea; color: #137333; }
+.status-error { background: #fce8e6; color: #c5221f; }
+.status-warn { background: #fef7e0; color: #e37400; }
+.hidden { display: none; }
+.quota-bar { height: 8px; background: #eee; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+.quota-fill { height: 100%; background: #4285f4; border-radius: 4px; transition: width 0.3s; }
+.order-list { list-style: none; }
+.order-list li { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+.order-list li:last-child { border-bottom: none; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+.tag-active { background: #e6f4ea; color: #137333; }
+.tag-expired { background: #fce8e6; color: #c5221f; }
+.tag-pending { background: #fef7e0; color: #e37400; }
+#login-section { text-align: center; padding: 48px 0; }
+#login-section h2 { margin-bottom: 16px; }
+#login-section p { color: #888; margin-bottom: 24px; }
+</style>
+</head>
+<body>
+<header>
+<h1>YT Sub Bot</h1>
+<span id="user-display" class="hidden"></span>
+</header>
+
+<div class="container">
+<!-- Login Section -->
+<div id="login-section">
+<h2>Welcome</h2>
+<p>Log in with Google to manage your subscriptions</p>
+<button class="btn btn-primary" onclick="login()">Log in with Google</button>
+</div>
+
+<!-- Authenticated Sections -->
+<div id="main-content" class="hidden">
+<!-- Status Card -->
+<div class="card">
+<h2>Account Status</h2>
+<div id="account-info"></div>
+<div id="quota-section">
+<p style="font-size:0.9rem;color:#555;">API Quota Used</p>
+<div class="quota-bar"><div class="quota-fill" id="quota-fill"></div></div>
+<p style="font-size:0.8rem;color:#888;margin-top:4px;" id="quota-text"></p>
+</div>
+</div>
+
+<!-- Subscribe Card -->
+<div class="card">
+<h2>Subscribe to a Channel</h2>
+<input class="input" id="channel-id" placeholder="YouTube Channel ID (e.g. UCxxxxxxxxxxxxxxxx)" />
+<button class="btn btn-success" onclick="subscribe()" style="margin-top:8px;">Subscribe</button>
+<div id="subscribe-result" style="margin-top:12px;"></div>
+</div>
+
+<!-- Orders Card -->
+<div class="card">
+<h2>Your Orders</h2>
+<ul class="order-list" id="order-list"></ul>
+<p id="no-orders" style="color:#888;font-size:0.9rem;">No orders yet.</p>
+</div>
+</div>
+</div>
+
+<script>
+let accessToken = null;
+
+async function login() {
+const res = await fetch('/.netlify/functions/auth', { method: 'POST' });
+const data = await res.json();
+if (data.authUrl) {
+window.location.href = data.authUrl;
+} else if (data.accessToken) {
+accessToken = data.accessToken;
+showApp();
+}
+}
+
+async function checkAuth() {
+try {
+const res = await fetch('/.netlify/functions/status');
+const data = await res.json();
+if (data.accessToken) {
+accessToken = data.accessToken;
+showApp();
+}
+} catch (e) {
+// Not logged in, stay on login screen
+}
+}
+
+async function showApp() {
+document.getElementById('login-section').classList.add('hidden');
+document.getElementById('main-content').classList.remove('hidden');
+await loadStatus();
+await loadOrders();
+}
+
+async function loadStatus() {
+try {
+const res = await fetch('/.netlify/functions/status');
+const data = await res.json();
+const info = document.getElementById('account-info');
+if (data.email) {
+info.innerHTML = '<p><strong>Email:</strong> ' + data.email + '</p><p><strong>Quota:</strong> ' + (data.quotaUsed || 0) + ' / ' + (data.quotaMax || 'N/A') + '</p>';
+}
+const used = data.quotaUsed || 0;
+const max = data.quotaMax || 10000;
+const pct = Math.min((used / max) * 100, 100);
+document.getElementById('quota-fill').style.width = pct + '%';
+document.getElementById('quota-text').textContent = used + ' / ' + max + ' requests (' + Math.round(pct) + '%)';
+} catch (e) {
+console.error('Failed to load status', e);
+}
+}
+
+async function loadOrders() {
+try {
+const res = await fetch('/.netlify/functions/orders');
+const data = await res.json();
+const list = document.getElementById('order-list');
+const noOrders = document.getElementById('no-orders');
+list.innerHTML = '';
+if (!data.orders || data.orders.length === 0) {
+noOrders.classList.remove('hidden');
+return;
+}
+noOrders.classList.add('hidden');
+data.orders.forEach(function(order) {
+var li = document.createElement('li');
+var tagClass = order.status === 'active' ? 'tag-active' : order.status === 'expired' ? 'tag-expired' : 'tag-pending';
+li.innerHTML = '<strong>' + (order.channelName || order.channelId) + '</strong> — <span class="tag ' + tagClass + '">' + order.status + '</span><br><small>' + (order.createdAt || '') + '</small>';
+list.appendChild(li);
+});
+} catch (e) {
+console.error('Failed to load orders', e);
+}
+}
+
+async function subscribe() {
+var channelId = document.getElementById('channel-id').value.trim();
+var resultDiv = document.getElementById('subscribe-result');
+if (!channelId) {
+resultDiv.innerHTML = '<div class="status status-error">Please enter a channel ID</div>';
+return;
+}
+resultDiv.innerHTML = '<div class="status status-warn">Processing...</div>';
+try {
+var res = await fetch('/.netlify/functions/subscribe', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ channelId: channelId })
+});
+var data = await res.json();
+if (data.success) {
+resultDiv.innerHTML = '<div class="status status-ok">Subscribed successfully!</div>';
+document.getElementById('channel-id').value = '';
+loadOrders();
+} else {
+resultDiv.innerHTML = '<div class="status status-error">' + (data.error || 'Failed') + '</div>';
+}
+} catch (e) {
+resultDiv.innerHTML = '<div class="status status-error">Network error</div>';
+}
+}
+
+checkAuth();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"9f0cb6c09a0044d6981ba2b8776adb52","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
