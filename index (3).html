@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube Sub Bot</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d2991d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 1rem; }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
+  input, select, textarea { width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.9rem; margin-bottom: 0.75rem; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  button { padding: 0.6rem 1.25rem; border: none; border-radius: 6px; font-size: 0.9rem; cursor: pointer; font-weight: 600; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .status-on { background: rgba(63,185,80,0.15); color: var(--green); }
+  .status-off { background: rgba(248,81,73,0.15); color: var(--red); }
+  .status-warn { background: rgba(210,153,29,0.15); color: var(--yellow); }
+  .msg { padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.85rem; margin-top: 0.5rem; }
+  .msg-ok { background: rgba(63,185,80,0.1); color: var(--green); }
+  .msg-err { background: rgba(248,81,73,0.1); color: var(--red); }
+  .msg-info { background: rgba(88,166,255,0.1); color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th, td { padding: 0.4rem 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .hidden { display: none; }
+  .pkg-badge { font-size: 0.7rem; padding: 0.1rem 0.4rem; border-radius: 3px; }
+  .pkg-free { background: rgba(63,185,80,0.15); color: var(--green); }
+  .pkg-pro { background: rgba(210,153,29,0.15); color: var(--yellow); }
+  .pkg-owner { background: rgba(248,81,73,0.15); color: var(--red); }
+  .quota-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 0.5rem; overflow: hidden; }
+  .quota-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.3s; }
+  .quota-fill.warn { background: var(--yellow); }
+  .quota-fill.danger { background: var(--red); }
+  code { background: var(--bg); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>YouTube Sub Bot</h1>
+  <p class="subtitle">Serverless — Netlify Functions</p>
+
+  <!-- Login card -->
+  <div id="loginCard" class="card">
+    <h2>Login</h2>
+    <label>Email</label>
+    <input id="loginEmail" type="email" placeholder="lemax1426@gmail.com" value="lemax1426@gmail.com">
+    <label>Password</label>
+    <input id="loginPass" type="password" placeholder="Password" value="Meadow5256">
+    <button class="btn-primary" id="loginBtn" onclick="login()">Sign In</button>
+    <div id="loginMsg"></div>
+  </div>
+
+  <!-- Main dashboard (hidden until logged in) -->
+  <div id="dashboard" class="hidden">
+    <div class="card">
+      <h2>Account</h2>
+      <div id="accountInfo"></div>
+      <div class="quota-bar"><div id="quotaFill" class="quota-fill" style="width:0%"></div></div>
+      <div id="quotaText" style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;"></div>
+    </div>
+
+    <div class="card">
+      <h2>New Order</h2>
+      <label>Channel URL</label>
+      <input id="channelUrl" type="url" placeholder="https://www.youtube.com/channel/UC...">
+      <label>Package</label>
+      <select id="pkgSelect">
+        <option value="free">Free</option>
+        <option value="pro" disabled>Pro (coming soon)</option>
+        <option value="premium" disabled>Premium (coming soon)</option>
+      </select>
+      <button class="btn-primary" id="orderBtn" onclick="placeOrder()">Place Order</button>
+      <div id="orderMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Orders</h2>
+      <div id="ordersList"></div>
+    </div>
+
+    <div class="card">
+      <h2>API Key</h2>
+      <label>YouTube Data API Key</label>
+      <input id="apiKey" type="password" placeholder="Paste your YouTube Data API key">
+      <button class="btn-primary" onclick="saveApiKey()">Save</button>
+      <div id="apiMsg"></div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem;">
+        Get a key at <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" style="color:var(--accent);">console.cloud.google.com</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+let TOKEN = localStorage.getItem('ytbot_token') || '';
+let API_KEY = localStorage.getItem('ytbot_apikey') || '';
+
+function show(msg, type) {
+  const el = document.getElementById(msg.id || 'loginMsg');
+  el.className = 'msg msg-' + type;
+  el.textContent = msg.text;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  if (!email || !pass) return show({text: 'Fill in both fields'}, 'err');
+  try {
+    const res = await fetch('/.netlify/functions/auth', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (data.success) {
+      TOKEN = data.token;
+      localStorage.setItem('ytbot_token', TOKEN);
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      loadAccount();
+      loadOrders();
+    } else {
+      show({text: data.error || 'Login failed'}, 'err');
+    }
+  } catch (e) {
+    show({text: 'Network error — is the function deployed?'}, 'err');
+  }
+}
+
+async function loadAccount() {
+  try {
+    const res = await fetch('/.netlify/functions/status', {
+      headers: {'Authorization': TOKEN}
+    });
+    const data = await res.json();
+    if (!data.success) return;
+    const info = document.getElementById('accountInfo');
+    info.innerHTML = `
+      <div style="margin-bottom:0.5rem"><strong>Package:</strong>
+        <span class="pkg-badge pkg-${data.package || 'free'}">${data.package || 'free'}</span></div>
+      <div><strong>Sub limit:</strong> ${data.sub_limit || 0}</div>
+    `;
+    // Show quota
+    const used = data.orders ? data.orders.filter(o => o.status === 'pending').length : 0;
+    const limit = data.sub_limit || 10000;
+    const pct = Math.min(100, (used / limit) * 100);
+    const fill = document.getElementById('quotaFill');
+    fill.style.width = pct + '%';
+    fill.className = 'quota-fill' + (pct > 80 ? (pct > 95 ? ' danger' : ' warn') : '');
+    document.getElementById('quotaText').textContent = `${used} / ${limit} pending (${pct.toFixed(0)}%)`;
+  } catch (e) { console.error(e); }
+}
+
+async function loadOrders() {
+  try {
+    const res = await fetch('/.netlify/functions/orders', {
+      headers: {'Authorization': TOKEN}
+    });
+    const data = await res.json();
+    if (!data.success) return;
+    const list = document.getElementById('ordersList');
+    const orders = data.orders || [];
+    if (orders.length === 0) {
+      list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;">No orders yet.</p>';
+      return;
+    }
+    let html = '<table><thead><tr><th>#</th><th>Channel</th><th>Package</th><th>Status</th></tr></thead><tbody>';
+    orders.forEach(o => {
+      html += `<tr>
+        <td>${o.id}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${o.channel_url}">${o.channel_url}</td>
+        <td><span class="pkg-badge pkg-${o.package || 'free'}">${o.package || 'free'}</span></td>
+        <td><span class="status ${o.status === 'completed' ? 'status-on' : o.status === 'failed' ? 'status-off' : 'status-warn'}">${o.status}</span></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    list.innerHTML = html;
+  } catch (e) { console.error(e); }
+}
+
+async function placeOrder() {
+  const url = document.getElementById('channelUrl').value.trim();
+  const pkg = document.getElementById('pkgSelect').value;
+  if (!url) return show({text: 'Enter a channel URL'}, 'err');
+  if (!API_KEY) return show({text: 'Save your YouTube API key first'}, 'err');
+  const btn = document.getElementById('orderBtn');
+  btn.disabled = true;
+  btn.textContent = 'Placing...';
+  try {
+    const res = await fetch('/.netlify/functions/subscribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': TOKEN
+      },
+      body: JSON.stringify({channel_url: url, package: pkg, api_key: API_KEY})
+    });
+    const data = await res.json();
+    if (data.success) {
+      show({text: 'Order #' + data.orderId + ' placed!'}, 'ok');
+      document.getElementById('channelUrl').value = '';
+      loadOrders();
+      loadAccount();
+    } else {
+      show({text: data.error || 'Order failed'}, 'err');
+    }
+  } catch (e) {
+    show({text: 'Network error'}, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Place Order';
+  }
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) return show({text: 'Enter an API key'}, 'err');
+  API_KEY = key;
+  localStorage.setItem('ytbot_apikey', key);
+  show({text: 'API key saved (stored locally only)'}, 'ok');
+}
+
+// Auto-login if token exists
+if (TOKEN) {
+  document.getElementById('loginCard').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  loadAccount();
+  loadOrders();
+}
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"9f0cb6c09a0044d6981ba2b8776adb52","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
